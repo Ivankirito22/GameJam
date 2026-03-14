@@ -47,14 +47,23 @@ _LEVEL_OBJECTS = {
         "npcs": [],
     },
     "level5.tmx": {
-        "barrels": [
-            {"col": 3, "row": 1, "dim": "A", "type": "green"},
-            {"col": 7, "row": 3, "dim": "B", "type": "red"},
-        ],
-        "door": (3, 0),
+        "barrels": [],
+        "door": (2, 9),
         "npcs": [
-            {"col": 5, "row": 4, "type": "jeffry"},
+            {"col": 5, "row": 3, "type": "jeffry"},
         ],
+        # Posiciones caminables (fallback si el TMX no tiene capa "paths")
+        "walkable": [
+            # Sala superior (filas 1-4)
+            *[(c, 1) for c in range(2, 8)],
+            *[(c, 2) for c in range(2, 8)],
+            *[(c, 3) for c in range(2, 8)],
+            *[(c, 4) for c in range(3, 7)],
+            # Sala inferior (filas 7-8)
+            (1, 7), (2, 7), (3, 7), (6, 7), (7, 7),
+            (1, 8), (2, 8), (3, 8),
+        ],
+        "start": (3, 1),
     },
 }
 
@@ -94,13 +103,17 @@ class Level:
         # Construir sets de posiciones para colision
         self._wall_set = {(x, y) for x, y, _ in self.walls}
         self._path_set = {(x, y) for x, y, _ in self.paths}
+
+        # Si no hay paths del TMX, usar walkable del fallback
+        fallback = _LEVEL_OBJECTS.get(self.tmx_filename, {})
+        if not self._path_set and "walkable" in fallback:
+            self._path_set = set(fallback["walkable"])
+
         self._bridge_sets = {}
         for dim_key, bridge in self.bridges.items():
             self._bridge_sets[dim_key] = {(x, y) for x, y, _ in bridge["tiles"]}
 
         # Barriles, puerta y NPCs: primero del TMX, si no del fallback en codigo
-        fallback = _LEVEL_OBJECTS.get(self.tmx_filename, {})
-
         tmx_barrels = data.get("barrels", [])
         tmx_door = data.get("door", None)
         tmx_npcs = data.get("npcs", [])
@@ -125,8 +138,10 @@ class Level:
                 "type": npc["type"], "talked": False,
             })
 
-        # Jugador: empieza en el primer path
-        if self.paths:
+        # Jugador: empieza en posicion definida o primer path
+        if "start" in fallback:
+            start_x, start_y = fallback["start"]
+        elif self.paths:
             start_x, start_y = self.paths[0][0], self.paths[0][1]
         else:
             start_x, start_y = 1, 1

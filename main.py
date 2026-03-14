@@ -10,7 +10,7 @@ El juego se organiza así:
         core/       → Configuración, lógica del nivel y clase Game
         entities/   → Clases de los objetos del juego (jugador, barril...)
         map/        → Generación del mapa del nivel
-        rendering/  → Todo lo que se dibuja en pantalla + partículas
+        rendering/  → Todo lo que se dibuja en pant alla + partículas
 """
 from src.core.game import Game
 

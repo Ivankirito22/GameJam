@@ -94,6 +94,20 @@ def load_level(filepath: str) -> dict:
                 "visible": visible,
             }
 
+    # Si no se encontraron capas walls/paths estandar, cargar TODAS las capas
+    # de tiles como fondo visual (para niveles con nombres de capa genericos)
+    if not level["walls"] and not level["paths"]:
+        for layer in tmx.visible_layers:
+            if not isinstance(layer, pytmx.TiledTileLayer):
+                continue
+            for x in range(tmx.width):
+                for y in range(tmx.height):
+                    gid = layer.data[y][x]
+                    if gid:
+                        surface = tmx.get_tile_image_by_gid(gid)
+                        if surface:
+                            level["walls"].append((x, y, _scale_surface(surface)))
+
     # Leer objetos (barriles, puerta) desde objectgroups
     for layer in tmx.layers:
         if not isinstance(layer, pytmx.TiledObjectGroup):

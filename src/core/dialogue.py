@@ -39,20 +39,20 @@ LEVEL_DIALOGUES = {
     ],
 }
 
-# Dialogo de Jeffrey Epstein en nivel 5
+# Dialogo de Jeffrey en nivel 5
 JEFFRY_DIALOGUE = [
     ("???", "Eh, tu! Si, tu, el que va saltando entre dimensiones."),
     ("???", "No pongas esa cara. Se exactamente lo que esta pasando aqui."),
-    ("Jeffrey Epstein", "Me llamo Jeffrey Epstein. Pero puedes llamarme Jeffrey. Encantado."),
-    ("Jeffrey Epstein", "Veras, yo llevo observando esta fractura dimensional desde hace tiempo."),
-    ("Jeffrey Epstein", "Tengo... digamos... recursos. Mucho poder social, politico, y sobre todo, dinero."),
-    ("Jeffrey Epstein", "Con mi influencia puedo movilizar a los mejores cientificos de ambas dimensiones."),
-    ("Jeffrey Epstein", "Y tu has demostrado tener el talento para navegar entre los dos mundos."),
-    ("Jeffrey Epstein", "Juntos podemos sellar la fractura de una vez por todas."),
-    ("Jeffrey Epstein", "Yo pondre los medios. Tu pon la voluntad."),
-    ("Jeffrey Epstein", "Mira, ya he activado el portal de sellado. Solo tienes que cruzarlo."),
-    ("Jeffrey Epstein", "Cuando lo hagas, las dimensiones se estabilizaran para siempre."),
-    ("Jeffrey Epstein", "Adelante, heroe. Es hora de arreglar el mundo. Los dos mundos."),
+    ("Jeffrey", "Me llamo Jeffrey. Pero puedes llamarme Jeffrey. Encantado."),
+    ("Jeffrey", "Veras, yo llevo observando esta fractura dimensional desde hace tiempo."),
+    ("Jeffrey", "Tengo... digamos... recursos. Mucho poder social, politico, y sobre todo, dinero."),
+    ("Jeffrey", "Con mi influencia puedo movilizar a los mejores cientificos de ambas dimensiones."),
+    ("Jeffrey", "Y tu has demostrado tener el talento para navegar entre los dos mundos."),
+    ("Jeffrey", "Juntos podemos sellar la fractura de una vez por todas."),
+    ("Jeffrey", "Yo pondre los medios. Tu pon la voluntad."),
+    ("Jeffrey", "Mira, ya he activado el portal de sellado. Solo tienes que cruzarlo."),
+    ("Jeffrey", "Cuando lo hagas, las dimensiones se estabilizaran para siempre."),
+    ("Jeffrey", "Adelante, heroe. Es hora de arreglar el mundo. Los dos mundos."),
 ]
 
 
