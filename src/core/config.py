@@ -17,6 +17,8 @@ FPS = 60
 RUNNING = "running"
 WON = "won"
 MENU = "menu"
+DIALOGUE = "dialogue"
+GAME_COMPLETED = "game_completed"
 
 # =============================================================================
 # NIVELES (auto-detectados desde assets/maps/)

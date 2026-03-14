@@ -37,6 +37,7 @@ def load_level(filepath: str) -> dict:
         "water": [],
         "barrels": [],
         "door": None,
+        "npcs": [],
     }
 
     for layer in tmx.visible_layers:
@@ -110,6 +111,13 @@ def load_level(filepath: str) -> dict:
                 })
             elif obj.name == "door":
                 level["door"] = (col, row)
+            elif obj.name.startswith("npc_"):
+                npc_type = obj.name[4:]  # e.g. "jeffry"
+                level["npcs"].append({
+                    "col": col,
+                    "row": row,
+                    "type": npc_type,
+                })
 
     # Buscar capas bridge- no visibles (no aparecen en visible_layers)
     for layer in tmx.layers:

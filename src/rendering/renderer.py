@@ -1,12 +1,13 @@
 """
 Sistema de renderizado basado en capas TMX.
 Dibuja: walls, paths, bridges (segun dimension), buttons, barrels, door, player, HUD.
+Tambien: dialogos, NPCs, pantalla de victoria final.
 """
 import math
 import os
 import pygame
 from src.core.level import Level
-from src.core.config import TILE_SIZE, PALETTE, WON
+from src.core.config import TILE_SIZE, PALETTE, WON, DIALOGUE, GAME_COMPLETED
 from src.rendering.particles import ParticleManager
 
 
@@ -25,6 +26,9 @@ class GameRenderer:
         self.font_big = pygame.font.SysFont("Arial", 42, bold=True)
         self.font_med = pygame.font.SysFont("Arial", 22)
         self.font_small = pygame.font.SysFont("Arial", 16)
+        self.font_dialogue_name = pygame.font.SysFont("Consolas", 18, bold=True)
+        self.font_dialogue_text = pygame.font.SysFont("Arial", 16)
+        self.font_title_big = pygame.font.SysFont("Consolas", 48, bold=True)
 
         sprite_size = (TILE_SIZE, TILE_SIZE)
         self.player_sprites = {
@@ -39,12 +43,17 @@ class GameRenderer:
             "red": _load_sprite("barril rojo.png", sprite_size),
         }
 
+        # Sprite de Jeffry
+        jeffry_path = os.path.join("Jeff", "jeffry.png")
+        self.jeffry_sprite = _load_sprite(jeffry_path, sprite_size)
+
         # Overlays cacheados
         self._btn_pressed_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
         self._btn_pressed_overlay.fill((0, 255, 0, 60))
 
     def draw(self, surface: pygame.Surface, level: Level,
-             game_state: str, death_reason: str, delta_time: float):
+             game_state: str, death_reason: str, delta_time: float,
+             dialogue_box=None, level_index: int = 0):
         surface.fill((0, 0, 0))
 
         # Dibujar capas en orden
@@ -59,6 +68,7 @@ class GameRenderer:
 
         # Barriles y jugador
         self._draw_barrels(surface, level)
+        self._draw_npcs(surface, level)
         self._draw_player(surface, level)
 
         # Particulas
@@ -69,13 +79,22 @@ class GameRenderer:
         # HUD
         self._draw_hud(surface, level)
 
+        # Indicador de interaccion con E
+        self._draw_interact_hint(surface, level)
+
         # Alerta
         level.update_alert(delta_time)
         if level.alert_message:
             self._draw_alert(surface, level.alert_message, level.alert_timer)
 
+        # Dialogo
+        if game_state == DIALOGUE and dialogue_box:
+            self._draw_dialogue(surface, dialogue_box)
+
         # Overlay de fin
-        if game_state != "running":
+        if game_state == GAME_COMPLETED:
+            self._draw_game_completed(surface)
+        elif game_state not in ("running", DIALOGUE):
             self._draw_overlay(surface, game_state, death_reason)
 
         pygame.display.flip()
@@ -125,6 +144,29 @@ class GameRenderer:
                     self.barrel_sprites["green"],
                 )
                 surface.blit(sprite, (x, y))
+
+    def _draw_npcs(self, surface: pygame.Surface, level: Level):
+        """Dibuja los NPCs del nivel."""
+        for npc in level.npcs:
+            x = npc["col"] * TILE_SIZE
+            y = npc["row"] * TILE_SIZE
+            if npc["type"] == "jeffry":
+                surface.blit(self.jeffry_sprite, (x, y))
+            # Indicador de nombre sobre el NPC
+            name = "Jeffrey Epstein" if npc["type"] == "jeffry" else npc["type"].capitalize()
+            name_surf = self.font_small.render(name, True, (255, 255, 200))
+            name_rect = name_surf.get_rect(centerx=x + TILE_SIZE // 2, bottom=y - 2)
+            surface.blit(name_surf, name_rect)
+
+    def _draw_interact_hint(self, surface: pygame.Surface, level: Level):
+        """Muestra '[E] Hablar' cuando el jugador esta cerca de un NPC."""
+        npc = level.try_interact()
+        if npc and not npc.get("talked", False):
+            px = level.player.col * TILE_SIZE + TILE_SIZE // 2
+            py = level.player.row * TILE_SIZE - 8
+            hint = self.font_small.render("[E] Hablar", True, (255, 255, 100))
+            hint_rect = hint.get_rect(centerx=px, bottom=py)
+            surface.blit(hint, hint_rect)
 
     def _apply_dimension_tint(self, surface: pygame.Surface, level: Level):
         tint = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -178,6 +220,54 @@ class GameRenderer:
         info = self.font_small.render(info_text, True, (180, 180, 180))
         surface.blit(info, (8, 22))
 
+    def _draw_dialogue(self, surface: pygame.Surface, dialogue_box):
+        """Dibuja la caja de dialogo en la parte inferior de la pantalla."""
+        w = surface.get_width()
+        h = surface.get_height()
+
+        # Fondo semitransparente
+        box_h = 100
+        box_y = h - box_h - 10
+        box_surf = pygame.Surface((w - 20, box_h), pygame.SRCALPHA)
+        box_surf.fill((0, 0, 0, 210))
+        surface.blit(box_surf, (10, box_y))
+
+        # Borde cyan
+        box_rect = pygame.Rect(10, box_y, w - 20, box_h)
+        pygame.draw.rect(surface, (0, 180, 200), box_rect, 2)
+
+        # Nombre del hablante
+        speaker = dialogue_box.current_speaker
+        speaker_color = (0, 220, 255) if speaker != "Jeffrey Epstein" else (255, 215, 0)
+        name_surf = self.font_dialogue_name.render(speaker, True, speaker_color)
+        surface.blit(name_surf, (22, box_y + 8))
+
+        # Texto del dialogo (con word wrap basico)
+        text = dialogue_box.current_text
+        max_width = w - 50
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            test = current_line + (" " if current_line else "") + word
+            if self.font_dialogue_text.size(test)[0] <= max_width:
+                current_line = test
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+
+        for i, line in enumerate(lines):
+            line_surf = self.font_dialogue_text.render(line, True, (220, 220, 220))
+            surface.blit(line_surf, (22, box_y + 32 + i * 20))
+
+        # Indicador de avance
+        pulse = int(180 + 60 * math.sin(pygame.time.get_ticks() / 300.0))
+        hint = self.font_small.render("[ENTER] continuar", True, (pulse, pulse, pulse))
+        surface.blit(hint, (w - hint.get_width() - 20, box_y + box_h - 22))
+
     def _draw_alert(self, surface: pygame.Surface, message: str, timer: float):
         """Dibuja un mensaje de alerta en la parte inferior."""
         alpha = min(255, int(timer * 200))
@@ -220,3 +310,34 @@ class GameRenderer:
                      sub_surf.get_rect(center=(center_x, center_y + 10)))
         surface.blit(ctrl_surf,
                      ctrl_surf.get_rect(center=(center_x, center_y + 45)))
+
+    def _draw_game_completed(self, surface: pygame.Surface):
+        """Pantalla de victoria final: juego completado."""
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        surface.blit(overlay, (0, 0))
+
+        cx = surface.get_width() // 2
+        cy = surface.get_height() // 2
+
+        # Titulo pulsante
+        pulse = int(220 + 35 * math.sin(pygame.time.get_ticks() / 500.0))
+        title_color = (pulse, 255, pulse)
+        title = self.font_title_big.render("FRACTURE", True, title_color)
+        surface.blit(title, title.get_rect(center=(cx, cy - 80)))
+
+        sub = self.font_big.render("Juego Completado!", True, (55, 255, 120))
+        surface.blit(sub, sub.get_rect(center=(cx, cy - 25)))
+
+        # Texto narrativo final
+        lines = [
+            "Gracias a tu valentia y la ayuda de Jeffrey Epstein,",
+            "las dos dimensiones se han estabilizado.",
+            "La fractura ha sido sellada para siempre.",
+        ]
+        for i, line in enumerate(lines):
+            line_surf = self.font_med.render(line, True, (200, 200, 220))
+            surface.blit(line_surf, line_surf.get_rect(center=(cx, cy + 25 + i * 28)))
+
+        ctrl = self.font_small.render("ENTER o ESC: Volver al menu", True, (140, 140, 140))
+        surface.blit(ctrl, ctrl.get_rect(center=(cx, cy + 120)))

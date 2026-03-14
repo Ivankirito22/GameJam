@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.0" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="4">
+<map version="1.10" tiledversion="1.12.0" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="1">
  <tileset firstgid="1" source="tiles1.tsx"/>
  <layer id="1" name="walls" width="10" height="10">
   <properties>
@@ -12,9 +12,9 @@
 35,0,0,49,50,50,0,0,49,35,
 35,42,42,64,50,63,42,42,64,35,
 35,50,50,50,50,50,50,50,50,35,
-35,0,0,50,50,50,50,50,50,35,
+35,50,50,50,50,55,50,56,50,35,
 35,50,50,0,56,51,0,49,50,35,
-35,50,50,0,0,0,0,0,50,35,
+35,50,50,0,0,51,0,49,50,35,
 35,35,35,35,35,35,35,35,35,35
 </data>
  </layer>
@@ -29,9 +29,9 @@
 0,5,28,0,0,51,13,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
-0,13,13,0,0,55,58,56,0,0,
-0,58,58,58,0,0,13,0,0,0,
-0,13,13,13,13,51,13,49,0,0,
+0,0,0,0,0,55,58,56,0,0,
+0,58,58,58,0,51,13,49,0,0,
+0,13,13,13,49,51,13,49,0,0,
 0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
@@ -105,19 +105,4 @@
 0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup id="7" name="objects">
-  <object id="1" name="barrel" x="96" y="48" width="16" height="16">
-   <properties>
-    <property name="dim" value="A"/>
-    <property name="color" value="green"/>
-   </properties>
-  </object>
-  <object id="2" name="barrel" x="48" y="128" width="16" height="16">
-   <properties>
-    <property name="dim" value="B"/>
-    <property name="color" value="yellow"/>
-   </properties>
-  </object>
-  <object id="3" name="door" x="32" y="0" width="16" height="16"/>
- </objectgroup>
 </map>

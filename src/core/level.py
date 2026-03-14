@@ -13,6 +13,51 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)
 )))
 
+# Datos de objetos por nivel (fallback cuando el TMX no tiene objectgroup).
+# Clave: nombre del archivo TMX.
+_LEVEL_OBJECTS = {
+    "level1.tmx": {
+        "barrels": [
+            {"col": 2, "row": 7, "dim": "B", "type": "green"},
+        ],
+        "door": (9, 3),
+        "npcs": [],
+    },
+    "level2.tmx": {
+        "barrels": [
+            {"col": 6, "row": 3, "dim": "A", "type": "green"},
+            {"col": 3, "row": 8, "dim": "B", "type": "yellow"},
+        ],
+        "door": (2, 0),
+        "npcs": [],
+    },
+    "level3.tmx": {
+        "barrels": [
+            {"col": 2, "row": 5, "dim": "A", "type": "green"},
+            {"col": 8, "row": 4, "dim": "B", "type": "green"},
+        ],
+        "door": (7, 0),
+        "npcs": [],
+    },
+    "level4.tmx": {
+        "barrels": [
+            {"col": 1, "row": 3, "dim": "B", "type": "yellow"},
+        ],
+        "door": (2, 0),
+        "npcs": [],
+    },
+    "level5.tmx": {
+        "barrels": [
+            {"col": 3, "row": 1, "dim": "A", "type": "green"},
+            {"col": 7, "row": 3, "dim": "B", "type": "red"},
+        ],
+        "door": (3, 0),
+        "npcs": [
+            {"col": 5, "row": 4, "type": "jeffry"},
+        ],
+    },
+}
+
 
 class Level:
     """Gestiona el estado y la logica del nivel."""
@@ -53,16 +98,32 @@ class Level:
         for dim_key, bridge in self.bridges.items():
             self._bridge_sets[dim_key] = {(x, y) for x, y, _ in bridge["tiles"]}
 
-        # Barriles y puerta (leidos directamente del TMX)
+        # Barriles, puerta y NPCs: primero del TMX, si no del fallback en codigo
+        fallback = _LEVEL_OBJECTS.get(self.tmx_filename, {})
+
+        tmx_barrels = data.get("barrels", [])
+        tmx_door = data.get("door", None)
+        tmx_npcs = data.get("npcs", [])
+
+        # Usar datos del TMX si existen, si no usar fallback
+        barrel_src = tmx_barrels if tmx_barrels else fallback.get("barrels", [])
         self.barrels = []
-        for b in data.get("barrels", []):
+        for b in barrel_src:
             self.barrels.append({
                 "col": b["col"], "row": b["row"],
                 "dim": b["dim"], "type": b.get("type", "green"),
             })
 
-        self.door_pos = data.get("door", None)
+        self.door_pos = tmx_door if tmx_door else fallback.get("door", None)
         self.door_open = False
+
+        npc_src = tmx_npcs if tmx_npcs else fallback.get("npcs", [])
+        self.npcs = []
+        for npc in npc_src:
+            self.npcs.append({
+                "col": npc["col"], "row": npc["row"],
+                "type": npc["type"], "talked": False,
+            })
 
         # Jugador: empieza en el primer path
         if self.paths:
@@ -133,7 +194,13 @@ class Level:
         return all(btn["pressed"] for btn in self.buttons)
 
     def _update_door(self):
-        """Abre o cierra la puerta segun el estado de los botones."""
+        """Abre o cierra la puerta segun el estado de los botones.
+        Si Jeffry ya ha sido hablado, la puerta queda abierta."""
+        # Si Jeffry ya abrio la puerta, no la cerramos
+        for npc in self.npcs:
+            if npc["type"] == "jeffry" and npc["talked"]:
+                self.door_open = True
+                return
         self.door_open = self._all_buttons_pressed()
 
     # =========================================================================
@@ -223,9 +290,21 @@ class Level:
 
         return (None, pushed)
 
-    def try_interact(self) -> str | None:
-        """Interaccion con E (reservado para futuras mecanicas)."""
+    def try_interact(self) -> dict | None:
+        """Interaccion con E. Devuelve info del NPC si hay uno adyacente."""
+        pcol, prow = self.player.col, self.player.row
+        for npc in self.npcs:
+            dx = abs(npc["col"] - pcol)
+            dy = abs(npc["row"] - prow)
+            if dx + dy <= 1:  # Adyacente (incluye misma casilla)
+                return npc
         return None
+
+    def mark_npc_talked(self, npc: dict):
+        """Marca un NPC como hablado y abre la puerta si es Jeffry."""
+        npc["talked"] = True
+        if npc["type"] == "jeffry":
+            self.door_open = True
 
     def reset(self):
         """Reinicia el nivel."""
