@@ -1,282 +1,197 @@
 """
-================================================================================
-SISTEMA DE RENDERIZADO
-================================================================================
-Este archivo se encarga de DIBUJAR todo lo que se ve en pantalla:
-    - El mapa de casillas (tiles).
-    - Las entidades (jugador, barriles, puerta, placa...).
-    - El HUD (información en la parte superior).
-    - Las pantallas de fin de juego (victoria/derrota).
-    - Los efectos de partículas.
-
-CONSEJO PARA JUNIORS:
-    - "Renderizar" = dibujar en pantalla.
-    - Pygame dibuja por capas: primero el fondo, luego los objetos, luego el HUD.
-    - Cada entidad tiene su propio método de dibujo (_draw_XXX).
-    - Los colores se definen como tuplas RGB: (rojo, verde, azul) de 0 a 255.
+Sistema de renderizado basado en capas TMX.
+Dibuja: walls, paths, bridges (segun dimension), buttons, barrels, door, player, HUD.
 """
+import math
+import os
 import pygame
 from src.core.level import Level
-from src.core.config import (
-    TILE_SIZE, ROWS, COLS, PALETTE, WALL, WATER, FLOOR, FLOOR_DECO,
-    CLR_PLATE_ON, CLR_PLATE_OFF, CLR_DOOR_OPEN, CLR_DOOR_CLOSED, CLR_WHITE,
-    CLR_BARREL, CLR_BARREL_EDGE, CLR_BARREL_LOCKED, CLR_DEBRIS,
-    CLR_PLAYER, CLR_PLAYER_EDGE, WON,
-)
+from src.core.config import TILE_SIZE, PALETTE, WON
 from src.rendering.particles import ParticleManager
 
 
-class TileRenderer:
-    """
-    Dibuja el mapa de casillas (tiles) en la pantalla.
-    Cada casilla se dibuja según su tipo (suelo, muro, agua...).
-    """
-
-    def draw(self, surface: pygame.Surface, grid: list[list[int]],
-             dim: str, barrel_bridges: set):
-        """
-        Dibuja todas las casillas del mapa.
-
-        Args:
-            surface: Superficie de Pygame donde dibujar.
-            grid: La cuadrícula del mapa (lista 2D de tipos de casilla).
-            dim: Dimensión actual ("A" o "B") para elegir la paleta.
-            barrel_bridges: Conjunto de posiciones donde hay puentes de barril.
-        """
-        pal = PALETTE[dim]
-
-        for row in range(ROWS):
-            for col in range(COLS):
-                rect = pygame.Rect(col * TILE_SIZE, row * TILE_SIZE,
-                                   TILE_SIZE, TILE_SIZE)
-                tile = grid[row][col]
-
-                if tile == WALL:
-                    # Muro: color sólido con borde sombreado
-                    pygame.draw.rect(surface, pal[WALL], rect)
-                    pygame.draw.rect(surface, pal["wall_shade"], rect, 1)
-
-                elif tile == WATER:
-                    if (col, row) in barrel_bridges:
-                        # Puente de barril: se dibuja como suelo decorado
-                        pygame.draw.rect(surface, pal[FLOOR_DECO], rect)
-                        pygame.draw.rect(surface, pal["grid_line"], rect, 1)
-                    else:
-                        # Agua: color de agua con líneas onduladas
-                        pygame.draw.rect(surface, pal[WATER], rect)
-                        darker = tuple(max(0, v - 25) for v in pal[WATER])
-                        y1 = rect.top + TILE_SIZE // 3
-                        y2 = rect.top + 2 * TILE_SIZE // 3
-                        pygame.draw.line(surface, darker,
-                                         (rect.left, y1), (rect.right, y1), 1)
-                        pygame.draw.line(surface, darker,
-                                         (rect.left, y2), (rect.right, y2), 1)
-
-                else:
-                    # Suelo normal o decorado
-                    color = pal[FLOOR_DECO] if tile == FLOOR_DECO else pal[FLOOR]
-                    pygame.draw.rect(surface, color, rect)
-                    pygame.draw.rect(surface, pal["grid_line"], rect, 1)
-                    # Punto decorativo en casillas FLOOR_DECO
-                    if tile == FLOOR_DECO:
-                        dot_color = tuple(max(0, v - 30) for v in color)
-                        pygame.draw.circle(surface, dot_color, rect.center, 1)
+def _load_sprite(relative_path: str, size: tuple[int, int]) -> pygame.Surface:
+    """Carga un sprite y lo escala al tamano indicado."""
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites", relative_path)
+    img = pygame.image.load(path).convert_alpha()
+    return pygame.transform.scale(img, size)
 
 
 class GameRenderer:
-    """
-    Renderizador principal del juego.
-    Coordina el dibujo de todos los elementos: tiles, entidades, HUD y partículas.
-    """
+    """Renderizador principal del juego."""
 
     def __init__(self):
-        """Inicializa las fuentes de texto y los sub-renderizadores."""
-        self.tile_renderer = TileRenderer()
         self.particle_manager = ParticleManager()
         self.font_big = pygame.font.SysFont("Arial", 42, bold=True)
         self.font_med = pygame.font.SysFont("Arial", 22)
         self.font_small = pygame.font.SysFont("Arial", 16)
 
+        sprite_size = (TILE_SIZE, TILE_SIZE)
+        self.player_sprites = {
+            (0, -1): _load_sprite(os.path.join("player", "backfronton 1.png"), sprite_size),
+            (0,  1): _load_sprite(os.path.join("player", "frontfronton 1.png"), sprite_size),
+            (-1, 0): _load_sprite(os.path.join("player", "leftfronton 1.png"), sprite_size),
+            (1,  0): _load_sprite(os.path.join("player", "rightfronton 1.png"), sprite_size),
+        }
+        self.barrel_sprites = {
+            "green": _load_sprite("barril verde.png", sprite_size),
+            "yellow": _load_sprite("barril amarillo.png", sprite_size),
+            "red": _load_sprite("barril rojo.png", sprite_size),
+        }
+
+        # Overlays cacheados
+        self._btn_pressed_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+        self._btn_pressed_overlay.fill((0, 255, 0, 60))
+
     def draw(self, surface: pygame.Surface, level: Level,
              game_state: str, death_reason: str, delta_time: float):
-        """
-        Dibuja un frame completo del juego.
+        surface.fill((0, 0, 0))
 
-        Args:
-            surface: Superficie de Pygame donde dibujar.
-            level: El objeto Level con todo el estado del juego.
-            game_state: Estado actual ("running", "dead", "won").
-            death_reason: Texto explicando la causa de la muerte.
-            delta_time: Tiempo desde el último frame (para partículas).
-        """
-        pal = PALETTE[level.dim]
-
-        # Paso 1: Rellenar el fondo
-        surface.fill(pal["wall_shade"])
-
-        # Paso 2: Dibujar las casillas del mapa
-        self.tile_renderer.draw(surface, level.grid, level.dim,
-                                level.barrel_bridges)
-
-        # Paso 3: Dibujar las entidades
-        self._draw_plate(surface, level)
+        # Dibujar capas en orden
+        self._draw_layer_tiles(surface, level.walls)
+        self._draw_layer_tiles(surface, level.paths)
+        self._draw_bridges(surface, level)
+        self._draw_buttons(surface, level)
         self._draw_door(surface, level)
-        if level.dim == "B":
-            self._draw_barrels(surface, level)
-        self._draw_debris(surface, level)
+
+        # Tinte dimensional
+        self._apply_dimension_tint(surface, level)
+
+        # Barriles y jugador
+        self._draw_barrels(surface, level)
         self._draw_player(surface, level)
 
-        # Paso 4: Procesar eventos de partículas pendientes
+        # Particulas
         self._process_particle_events(level)
-
-        # Paso 5: Actualizar y dibujar partículas
         self.particle_manager.update(delta_time)
         self.particle_manager.draw(surface)
 
-        # Paso 6: Dibujar el HUD (encima de todo)
-        self._draw_hud(surface, level, pal)
+        # HUD
+        self._draw_hud(surface, level)
 
-        # Paso 7: Dibujar pantalla de fin si no estamos jugando
+        # Alerta
+        level.update_alert(delta_time)
+        if level.alert_message:
+            self._draw_alert(surface, level.alert_message, level.alert_timer)
+
+        # Overlay de fin
         if game_state != "running":
             self._draw_overlay(surface, game_state, death_reason)
 
-        # Paso 8: Actualizar la pantalla
         pygame.display.flip()
 
-    def _process_particle_events(self, level: Level):
-        """
-        Lee los eventos de partículas pendientes del nivel y los ejecuta.
-        Después de procesarlos, limpia la lista.
-        """
-        for event in level.pending_particle_events:
-            if event["type"] == "water_splash":
-                self.particle_manager.spawn_water_splash(
-                    event["col"], event["row"])
-            elif event["type"] == "dimension_switch":
-                self.particle_manager.spawn_dimension_switch(
-                    event["col"], event["row"], event["new_dim"])
-            elif event["type"] == "push":
-                self.particle_manager.spawn_push_effect(
-                    event["col"], event["row"])
+    def _draw_layer_tiles(self, surface: pygame.Surface, tiles: list):
+        """Dibuja una lista de tiles (x, y, surface)."""
+        for x, y, tile_surf in tiles:
+            surface.blit(tile_surf, (x * TILE_SIZE, y * TILE_SIZE))
 
-        level.pending_particle_events.clear()
+    def _draw_bridges(self, surface: pygame.Surface, level: Level):
+        """Dibuja los puentes de la dimension actual."""
+        for dim_key, bridge in level.bridges.items():
+            if dim_key == level.dim:
+                for x, y, tile_surf in bridge["tiles"]:
+                    surface.blit(tile_surf, (x * TILE_SIZE, y * TILE_SIZE))
 
-    # =========================================================================
-    # MÉTODOS DE DIBUJO DE ENTIDADES
-    # =========================================================================
-
-    def _draw_plate(self, surface: pygame.Surface, level: Level):
-        """Dibuja la placa de presión (amarilla si activada, apagada si no)."""
-        plate = level.plate
-        pressed = plate.is_pressed_by(level.player, level.barrels, level.dim)
-        color = CLR_PLATE_ON if pressed else CLR_PLATE_OFF
-
-        center_x = plate.col * TILE_SIZE + TILE_SIZE // 2
-        center_y = plate.row * TILE_SIZE + TILE_SIZE // 2
-        radius = TILE_SIZE // 2 - 8
-
-        pygame.draw.circle(surface, color, (center_x, center_y), radius)
-        edge_color = tuple(max(0, v - 55) for v in color)
-        pygame.draw.circle(surface, edge_color, (center_x, center_y), radius, 2)
+    def _draw_buttons(self, surface: pygame.Surface, level: Level):
+        """Dibuja los botones con su sprite del tileset."""
+        for btn in level.buttons:
+            x, y = btn["pos"]
+            surface.blit(btn["surface"], (x * TILE_SIZE, y * TILE_SIZE))
+            if btn.get("pressed", False):
+                surface.blit(self._btn_pressed_overlay, (x * TILE_SIZE, y * TILE_SIZE))
 
     def _draw_door(self, surface: pygame.Surface, level: Level):
-        """Dibuja la puerta doble (verde si abierta, roja con X si cerrada)."""
-        door = level.door
-        for col, row in [(door.col1, door.row1), (door.col2, door.row2)]:
-            rect = pygame.Rect(col * TILE_SIZE, row * TILE_SIZE,
-                               TILE_SIZE, TILE_SIZE)
-            if door.is_open:
-                pygame.draw.rect(surface, CLR_DOOR_OPEN, rect)
-                pygame.draw.rect(surface, (25, 160, 40), rect, 1)
-            else:
-                pygame.draw.rect(surface, CLR_DOOR_CLOSED, rect)
-                pygame.draw.rect(surface, (150, 25, 25), rect, 1)
-                # Dibujar una X para indicar que está cerrada
-                pygame.draw.line(surface, CLR_WHITE,
-                                 (rect.left + 1, rect.top + 1),
-                                 (rect.right - 1, rect.bottom - 1), 1)
-                pygame.draw.line(surface, CLR_WHITE,
-                                 (rect.right - 1, rect.top + 1),
-                                 (rect.left + 1, rect.bottom - 1), 1)
+        """Dibuja la puerta de salida."""
+        if level.door_pos is None:
+            return
+        dx, dy = level.door_pos
+        rect = pygame.Rect(dx * TILE_SIZE, dy * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        if level.door_open:
+            pygame.draw.rect(surface, (35, 200, 55), rect)
+            # Borde
+            pygame.draw.rect(surface, (25, 150, 40), rect, 3)
+        else:
+            pygame.draw.rect(surface, (195, 35, 35), rect)
+            pygame.draw.rect(surface, (140, 25, 25), rect, 3)
 
     def _draw_barrels(self, surface: pygame.Surface, level: Level):
-        """Dibuja todos los barriles (marrones normales, grises si bloqueados)."""
+        """Dibuja los barriles de la dimension actual con su color."""
         for barrel in level.barrels:
-            center_x = barrel.col * TILE_SIZE + TILE_SIZE // 2
-            center_y = barrel.row * TILE_SIZE + TILE_SIZE // 2
-            radius = TILE_SIZE // 2 - 8
+            if barrel["dim"] == level.dim:
+                x = barrel["col"] * TILE_SIZE
+                y = barrel["row"] * TILE_SIZE
+                sprite = self.barrel_sprites.get(
+                    barrel.get("type", "green"),
+                    self.barrel_sprites["green"],
+                )
+                surface.blit(sprite, (x, y))
 
-            # Sombra del barril
-            shadow_rect = pygame.Rect(
-                barrel.col * TILE_SIZE + 1,
-                barrel.row * TILE_SIZE + 1,
-                TILE_SIZE - 1, TILE_SIZE - 1,
-            )
-            pygame.draw.rect(surface, (60, 40, 20), shadow_rect)
+    def _apply_dimension_tint(self, surface: pygame.Surface, level: Level):
+        tint = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        if level.dim == "A":
+            tint.fill((255, 200, 100, 25))
+        else:
+            tint.fill((80, 120, 255, 35))
+        surface.blit(tint, (0, 0))
 
-            # Color según si está bloqueado o no
-            if barrel.locked:
-                body_color = CLR_BARREL_LOCKED
-                edge_color = (60, 60, 60)
-            else:
-                body_color = CLR_BARREL
-                edge_color = CLR_BARREL_EDGE
+        # Shader rojo sangre en agua para dim B
+        if level.dim == "B" and level.water_positions:
+            self._draw_blood_water(surface, level)
 
-            pygame.draw.circle(surface, body_color, (center_x, center_y), radius)
-            pygame.draw.circle(surface, edge_color, (center_x, center_y), radius, 1)
+    def _draw_blood_water(self, surface: pygame.Surface, level: Level):
+        """Aplica un efecto rojo sangre sobre tiles de agua en dim B."""
+        pulse = int(80 + 25 * math.sin(pygame.time.get_ticks() / 400.0))
+        overlay = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+        overlay.fill((180, 15, 15, pulse))
+        for wx, wy in level.water_positions:
+            surface.blit(overlay, (wx * TILE_SIZE, wy * TILE_SIZE))
 
-    def _draw_debris(self, surface: pygame.Surface, level: Level):
-        """Dibuja los escombros (obstáculos marrones)."""
-        for debris in level.debris:
-            rect = pygame.Rect(debris.col * TILE_SIZE, debris.row * TILE_SIZE,
-                               TILE_SIZE, TILE_SIZE)
-            pygame.draw.rect(surface, CLR_DEBRIS, rect)
-            pygame.draw.rect(surface, (70, 50, 25), rect, 1)
+    def _process_particle_events(self, level: Level):
+        for event in level.pending_particle_events:
+            if event["type"] == "dimension_switch":
+                self.particle_manager.spawn_dimension_switch(
+                    event["col"], event["row"], event["new_dim"])
+        level.pending_particle_events.clear()
 
     def _draw_player(self, surface: pygame.Surface, level: Level):
-        """Dibuja al jugador (círculo verde con ojos)."""
-        px = level.player.col * TILE_SIZE + TILE_SIZE // 2
-        py = level.player.row * TILE_SIZE + TILE_SIZE // 2
-        radius = TILE_SIZE // 2 - 8
+        x = level.player.col * TILE_SIZE
+        y = level.player.row * TILE_SIZE
+        facing = level.player.facing_dir
+        sprite = self.player_sprites.get(facing, self.player_sprites[(0, 1)])
+        surface.blit(sprite, (x, y))
 
-        # Sombra
-        pygame.draw.circle(surface, (40, 35, 30), (px + 2, py + 3), radius)
-        # Cuerpo
-        pygame.draw.circle(surface, CLR_PLAYER, (px, py), radius)
-        # Borde
-        pygame.draw.circle(surface, CLR_PLAYER_EDGE, (px, py), radius, 2)
-        # Ojos
-        pygame.draw.circle(surface, (25, 85, 25), (px - 3, py - 3), 2)
-        pygame.draw.circle(surface, (25, 85, 25), (px + 3, py - 3), 2)
-
-    # =========================================================================
-    # HUD Y PANTALLAS DE FIN
-    # =========================================================================
-
-    def _draw_hud(self, surface: pygame.Surface, level: Level, pal: dict):
-        """Dibuja la barra de información superior."""
-        # Fondo semitransparente
+    def _draw_hud(self, surface: pygame.Surface, level: Level):
+        pal = PALETTE[level.dim]
         bar = pygame.Surface((surface.get_width(), 40), pygame.SRCALPHA)
         bar.fill((0, 0, 0, 150))
         surface.blit(bar, (0, 0))
 
-        # Texto de dimensión actual
-        dim_text = ("Dimension A  (Original)" if level.dim == "A"
-                    else "Dimension B  (Opuesta)")
+        dim_text = ("Dimension A" if level.dim == "A" else "Dimension B")
         surf = self.font_med.render(dim_text, True, pal["hud_dim"])
         surface.blit(surf, (8, 3))
 
-        # Controles e información
-        door_state = "Abierta" if level.door.is_open else "Cerrada"
-        info_text = (f"Puerta: {door_state}  |  "
-                     f"ESPACIO: cambiar dim  |  E: empujar")
+        # Contar botones
+        pressed = sum(1 for b in level.buttons if b.get("pressed", False))
+        total = len(level.buttons)
+        door_status = "ABIERTA" if level.door_open else "CERRADA"
+        info_text = f"Botones: {pressed}/{total}  |  Puerta: {door_status}  |  ESPACIO: cambiar dim"
         info = self.font_small.render(info_text, True, (180, 180, 180))
         surface.blit(info, (8, 22))
 
+    def _draw_alert(self, surface: pygame.Surface, message: str, timer: float):
+        """Dibuja un mensaje de alerta en la parte inferior."""
+        alpha = min(255, int(timer * 200))
+        w = surface.get_width()
+        h = surface.get_height()
+        alert_surf = pygame.Surface((w, 36), pygame.SRCALPHA)
+        alert_surf.fill((180, 30, 30, alpha))
+        surface.blit(alert_surf, (0, h - 36))
+        text = self.font_small.render(message, True, (255, 255, 255))
+        text.set_alpha(alpha)
+        surface.blit(text, text.get_rect(center=(w // 2, h - 18)))
+
     def _draw_overlay(self, surface: pygame.Surface, game_state: str,
                       death_reason: str):
-        """Dibuja la pantalla de victoria o derrota."""
-        # Fondo oscuro semitransparente
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 175))
         surface.blit(overlay, (0, 0))
@@ -284,26 +199,24 @@ class GameRenderer:
         center_x = surface.get_width() // 2
         center_y = surface.get_height() // 2
 
-        # Elegir textos según el estado
         if game_state == WON:
-            title = "Has ganado!"
+            title = "Nivel completado!"
             title_color = (55, 255, 80)
-            subtitle = "Has resuelto el puzzle dimensional."
+            subtitle = "Has abierto la puerta y escapado."
+            controls = "ENTER: Siguiente nivel  |  R: Repetir  |  ESC: Menu"
         else:
             title = "Has muerto"
             title_color = (255, 65, 65)
             subtitle = death_reason
+            controls = "R: Reintentar  |  ESC: Menu"
 
-        # Renderizar textos
         title_surf = self.font_big.render(title, True, title_color)
         sub_surf = self.font_med.render(subtitle, True, (200, 200, 200))
-        restart_surf = self.font_med.render("Pulsa R para reiniciar",
-                                            True, (160, 160, 160))
+        ctrl_surf = self.font_small.render(controls, True, (160, 160, 160))
 
-        # Colocar textos centrados
         surface.blit(title_surf,
                      title_surf.get_rect(center=(center_x, center_y - 40)))
         surface.blit(sub_surf,
                      sub_surf.get_rect(center=(center_x, center_y + 10)))
-        surface.blit(restart_surf,
-                     restart_surf.get_rect(center=(center_x, center_y + 45)))
+        surface.blit(ctrl_surf,
+                     ctrl_surf.get_rect(center=(center_x, center_y + 45)))

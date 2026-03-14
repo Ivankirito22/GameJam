@@ -1,3 +1,4 @@
 pygame-ce
 particlepy
 numpy
+pytmx

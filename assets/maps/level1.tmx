@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.12.0" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="3">
+ <editorsettings>
+  <export target="level1.tmx" format="tmx"/>
+ </editorsettings>
+ <tileset firstgid="1" source="tiles1.tsx"/>
+ <layer id="1" name="walls" width="10" height="10">
+  <properties>
+   <property name="walkable" type="bool" value="false"/>
+  </properties>
+  <data encoding="csv">
+35,35,35,35,35,35,35,35,35,35,
+35,0,0,49,50,50,50,50,50,35,
+35,0,0,0,0,0,0,0,0,35,
+35,0,0,0,0,0,0,0,0,38,
+35,0,0,0,0,0,0,0,0,35,
+35,42,42,42,42,42,42,42,42,35,
+35,0,47,0,0,56,50,50,50,35,
+35,0,0,0,0,49,50,55,56,35,
+35,0,0,0,0,49,50,63,64,35,
+35,35,35,35,35,35,35,35,35,35
+</data>
+ </layer>
+ <layer id="2" name="paths" width="10" height="10">
+  <properties>
+   <property name="walkable" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,13,13,0,0,0,0,0,0,0,
+0,13,13,57,58,58,58,58,58,0,
+0,13,13,13,13,13,13,13,13,0,
+0,13,13,13,13,13,13,13,13,0,
+0,0,0,0,0,0,0,0,0,0,
+0,58,58,58,58,0,0,0,0,0,
+0,18,18,18,20,0,0,0,0,0,
+0,27,0,1,10,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="3" name="btn" width="10" height="10">
+  <properties>
+   <property name="type" value="green"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,46,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="4" name="bridge-b" width="10" height="10" visible="0">
+  <properties>
+   <property name="dimension" value="B"/>
+   <property name="walkable" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,47,0,0,0,0,0,0,
+0,0,0,47,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="5" name="objects">
+  <object id="1" name="barrel" x="32" y="112" width="16" height="16">
+   <properties>
+    <property name="dim" value="B"/>
+    <property name="color" value="green"/>
+   </properties>
+  </object>
+  <object id="2" name="door" x="144" y="48" width="16" height="16"/>
+ </objectgroup>
+</map>
